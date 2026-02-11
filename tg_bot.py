@@ -1,8 +1,8 @@
 import os
-import json
 import logging
 import random
 from dotenv import load_dotenv
+from quiz_utils import load_questions, normalize_answer
 
 import redis
 from telegram import Update, ReplyKeyboardMarkup
@@ -24,12 +24,6 @@ BTN_GIVE_UP = "Сдаться"
 BTN_SCORE = "Мой счёт"
 
 
-def load_questions(path: str = "questions.json"):
-    """Загрузить список вопросов из JSON-файла."""
-    with open(path, "r", encoding="utf-8") as f:
-        return json.load(f)
-
-
 def get_keyboard() -> ReplyKeyboardMarkup:
     """Клавиатура с основными кнопками."""
     keyboard = [
@@ -42,32 +36,6 @@ def get_keyboard() -> ReplyKeyboardMarkup:
 def make_redis_key(user_id: int, suffix: str) -> str:
     """Сформировать ключ Redis."""
     return f"quiz:{user_id}:{suffix}"
-
-
-def normalize_answer(text: str) -> str:
-    """
-    Нормализовать ответ:
-    - обрезать по первой точке или скобке;
-    - убрать лишнюю пунктуацию;
-    - привести к нижнему регистру;
-    - нормализовать ё -> е.
-    """
-    if not text:
-        return ""
-
-    text = text.strip().lower()
-
-    cut_pos = len(text)
-    for separator in (".", "("):
-        index = text.find(separator)
-        if index != -1 and index < cut_pos:
-            cut_pos = index
-
-    core = text[:cut_pos].strip()
-    core = core.strip(" .,!?:;—-\"'«»")
-    core = core.replace("ё", "е")
-
-    return core
 
 
 def start(update: Update, context: CallbackContext) -> None:
