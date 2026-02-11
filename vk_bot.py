@@ -17,11 +17,6 @@ BTN_GIVE_UP = "Сдаться"
 BTN_SCORE = "Мой счёт"
 
 
-def make_redis_key(user_id: int, suffix: str) -> str:
-    """Сформировать ключ Redis."""
-    return f"quiz:{user_id}:{suffix}"
-
-
 def build_keyboard() -> str:
     """Создать клавиатуру ВК."""
     keyboard = VkKeyboard(one_time=False, inline=False)
@@ -57,8 +52,8 @@ def handle_new_question_request(
     """Выдать пользователю новый вопрос и сохранить его в Redis."""
     question = random.choice(questions)
 
-    redis_client.set(make_redis_key(user_id, "current_question"), question["question"])
-    redis_client.set(make_redis_key(user_id, "current_answer"), question["answer"])
+    redis_client.set(f"quiz:vk:{user_id}:current_question", question["question"])
+    redis_client.set(f"quiz:vk:{user_id}:current_answer", question["answer"])
 
     send_message(vk_api, user_id, question["question"], keyboard=keyboard)
 
@@ -70,7 +65,7 @@ def handle_give_up(
     keyboard: str,
 ) -> None:
     """Показать правильный ответ и завершить текущий вопрос."""
-    current_answer = redis_client.get(make_redis_key(user_id, "current_answer"))
+    current_answer = redis_client.get(f"quiz:vk:{user_id}:current_answer")
 
     if not current_answer:
         send_message(
@@ -83,8 +78,8 @@ def handle_give_up(
 
     current_answer = current_answer.decode("utf-8")
 
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
-    redis_client.set(make_redis_key(user_id, "total"), total_questions + 1)
+    total_questions = int(redis_client.get(f"quiz:vk:{user_id}:total") or 0)
+    redis_client.set(f"quiz:vk:{user_id}:total", total_questions + 1)
 
     send_message(
         vk_api,
@@ -94,8 +89,8 @@ def handle_give_up(
         keyboard=keyboard,
     )
 
-    redis_client.delete(make_redis_key(user_id, "current_answer"))
-    redis_client.delete(make_redis_key(user_id, "current_question"))
+    redis_client.delete(f"quiz:vk:{user_id}:current_answer")
+    redis_client.delete(f"quiz:vk:{user_id}:current_question")
 
 
 def show_score(
@@ -105,8 +100,8 @@ def show_score(
     keyboard: str,
 ) -> None:
     """Показать статистику пользователя."""
-    correct_answers = int(redis_client.get(make_redis_key(user_id, "correct")) or 0)
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
+    correct_answers = int(redis_client.get(f"quiz:vk:{user_id}:correct") or 0)
+    total_questions = int(redis_client.get(f"quiz:vk:{user_id}:total") or 0)
 
     if total_questions == 0:
         message_text = "Ты ещё не ответил ни на один вопрос. Нажми «Новый вопрос»!"
@@ -128,7 +123,7 @@ def handle_solution_attempt(
     keyboard: str,
 ) -> None:
     """Обработать попытку ответа на вопрос."""
-    current_answer = redis_client.get(make_redis_key(user_id, "current_answer"))
+    current_answer = redis_client.get(f"quiz:vk:{user_id}:current_answer")
 
     if not current_answer:
         send_message(
@@ -141,15 +136,15 @@ def handle_solution_attempt(
 
     current_answer = current_answer.decode("utf-8")
 
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
-    redis_client.set(make_redis_key(user_id, "total"), total_questions + 1)
+    total_questions = int(redis_client.get(f"quiz:vk:{user_id}:total") or 0)
+    redis_client.set(f"quiz:vk:{user_id}:total", total_questions + 1)
 
     normalized_user_answer = normalize_answer(user_answer)
     normalized_correct_answer = normalize_answer(current_answer)
 
     if normalized_user_answer and normalized_user_answer == normalized_correct_answer:
-        correct_answers = int(redis_client.get(make_redis_key(user_id, "correct")) or 0)
-        redis_client.set(make_redis_key(user_id, "correct"), correct_answers + 1)
+        correct_answers = int(redis_client.get(f"quiz:vk:{user_id}:correct") or 0)
+        redis_client.set(f"quiz:vk:{user_id}:correct", correct_answers + 1)
 
         send_message(
             vk_api,
@@ -167,8 +162,8 @@ def handle_solution_attempt(
             keyboard=keyboard,
         )
 
-    redis_client.delete(make_redis_key(user_id, "current_answer"))
-    redis_client.delete(make_redis_key(user_id, "current_question"))
+    redis_client.delete(f"quiz:vk:{user_id}:current_answer")
+    redis_client.delete(f"quiz:vk:{user_id}:current_question")
 
 
 def main() -> None:

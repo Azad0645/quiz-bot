@@ -33,11 +33,6 @@ def get_keyboard() -> ReplyKeyboardMarkup:
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True)
 
 
-def make_redis_key(user_id: int, suffix: str) -> str:
-    """Сформировать ключ Redis."""
-    return f"quiz:{user_id}:{suffix}"
-
-
 def start(update: Update, context: CallbackContext) -> None:
     """Обработчик команды /start."""
     user = update.effective_user
@@ -69,8 +64,8 @@ def handle_new_question_request(update: Update, context: CallbackContext) -> int
     user_id = update.effective_user.id
     question = random.choice(questions)
 
-    redis_client.set(make_redis_key(user_id, "current_question"), question["question"])
-    redis_client.set(make_redis_key(user_id, "current_answer"), question["answer"])
+    redis_client.set(f"quiz:tg:{user_id}:current_question", question["question"])
+    redis_client.set(f"quiz:tg:{user_id}:current_answer", question["answer"])
 
     update.message.reply_text(question["question"], reply_markup=get_keyboard())
 
@@ -82,7 +77,7 @@ def handle_give_up(update: Update, context: CallbackContext) -> int:
     redis_client: redis.Redis = context.bot_data["redis"]
     user_id = update.effective_user.id
 
-    current_answer = redis_client.get(make_redis_key(user_id, "current_answer"))
+    current_answer = redis_client.get(f"quiz:tg:{user_id}:current_answer")
 
     if not current_answer:
         update.message.reply_text(
@@ -93,8 +88,8 @@ def handle_give_up(update: Update, context: CallbackContext) -> int:
 
     current_answer = current_answer.decode("utf-8")
 
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
-    redis_client.set(make_redis_key(user_id, "total"), total_questions + 1)
+    total_questions = int(redis_client.get(f"quiz:tg:{user_id}:total") or 0)
+    redis_client.set(f"quiz:tg:{user_id}:total", total_questions + 1)
 
     update.message.reply_text(
         f"Правильный ответ: {current_answer}\n\n"
@@ -102,8 +97,8 @@ def handle_give_up(update: Update, context: CallbackContext) -> int:
         reply_markup=get_keyboard(),
     )
 
-    redis_client.delete(make_redis_key(user_id, "current_answer"))
-    redis_client.delete(make_redis_key(user_id, "current_question"))
+    redis_client.delete(f"quiz:tg:{user_id}:current_answer")
+    redis_client.delete(f"quiz:tg:{user_id}:current_question")
 
     return QUIZ_STATE
 
@@ -113,8 +108,8 @@ def show_score(update: Update, context: CallbackContext) -> int:
     redis_client: redis.Redis = context.bot_data["redis"]
     user_id = update.effective_user.id
 
-    correct_answers = int(redis_client.get(make_redis_key(user_id, "correct")) or 0)
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
+    correct_answers = int(redis_client.get(f"quiz:tg:{user_id}:correct") or 0)
+    total_questions = int(redis_client.get(f"quiz:tg:{user_id}:total") or 0)
 
     if total_questions == 0:
         message_text = "Ты ещё не ответил ни на один вопрос. Нажми «Новый вопрос»!"
@@ -135,7 +130,7 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> int:
     user_id = update.effective_user.id
     user_answer = update.message.text.strip()
 
-    current_answer = redis_client.get(make_redis_key(user_id, "current_answer"))
+    current_answer = redis_client.get(f"quiz:tg:{user_id}:current_answer")
 
     if not current_answer:
         update.message.reply_text(
@@ -146,15 +141,15 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> int:
 
     current_answer = current_answer.decode("utf-8")
 
-    total_questions = int(redis_client.get(make_redis_key(user_id, "total")) or 0)
-    redis_client.set(make_redis_key(user_id, "total"), total_questions + 1)
+    total_questions = int(redis_client.get(f"quiz:tg:{user_id}:total") or 0)
+    redis_client.set(f"quiz:tg:{user_id}:total", total_questions + 1)
 
     normalized_user_answer = normalize_answer(user_answer)
     normalized_correct_answer = normalize_answer(current_answer)
 
     if normalized_user_answer and normalized_user_answer == normalized_correct_answer:
-        correct_answers = int(redis_client.get(make_redis_key(user_id, "correct")) or 0)
-        redis_client.set(make_redis_key(user_id, "correct"), correct_answers + 1)
+        correct_answers = int(redis_client.get(f"quiz:tg:{user_id}:correct") or 0)
+        redis_client.set(f"quiz:tg:{user_id}:correct", correct_answers + 1)
 
         update.message.reply_text(
             "Верно!\n"
@@ -168,8 +163,8 @@ def handle_solution_attempt(update: Update, context: CallbackContext) -> int:
             reply_markup=get_keyboard(),
         )
 
-    redis_client.delete(make_redis_key(user_id, "current_answer"))
-    redis_client.delete(make_redis_key(user_id, "current_question"))
+    redis_client.delete(f"quiz:tg:{user_id}:current_answer")
+    redis_client.delete(f"quiz:tg:{user_id}:current_question")
 
     return QUIZ_STATE
 
